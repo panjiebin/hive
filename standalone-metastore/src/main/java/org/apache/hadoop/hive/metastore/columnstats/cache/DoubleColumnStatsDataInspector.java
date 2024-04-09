@@ -43,6 +43,10 @@ public class DoubleColumnStatsDataInspector extends DoubleColumnStatsData {
     }
   }
 
+  public DoubleColumnStatsDataInspector(DoubleColumnStatsData other) {
+    super(other);
+  }
+
   @Override
   public DoubleColumnStatsDataInspector deepCopy() {
     return new DoubleColumnStatsDataInspector(this);
@@ -117,7 +121,7 @@ public class DoubleColumnStatsDataInspector extends DoubleColumnStatsData {
 
   private void updateNdvEstimator() {
     this.ndvEstimator = NumDistinctValueEstimatorFactory
-        .getNumDistinctValueEstimator(super.getBitVectors());
+            .getNumDistinctValueEstimator(super.getBitVectors());
     super.unsetBitVectors();
   }
 

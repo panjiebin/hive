@@ -43,6 +43,10 @@ public class DecimalColumnStatsDataInspector extends DecimalColumnStatsData {
     }
   }
 
+  public DecimalColumnStatsDataInspector(DecimalColumnStatsData other) {
+    super(other);
+  }
+
   @Override
   public DecimalColumnStatsDataInspector deepCopy() {
     return new DecimalColumnStatsDataInspector(this);
@@ -117,7 +121,7 @@ public class DecimalColumnStatsDataInspector extends DecimalColumnStatsData {
 
   private void updateNdvEstimator() {
     this.ndvEstimator = NumDistinctValueEstimatorFactory
-        .getNumDistinctValueEstimator(super.getBitVectors());
+            .getNumDistinctValueEstimator(super.getBitVectors());
     super.unsetBitVectors();
   }
 

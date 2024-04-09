@@ -38,14 +38,16 @@ import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.ColStatsObjWithSour
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hive.metastore.columnstats.ColumnsStatsUtils.stringInspectorFromStats;
+
 public class StringColumnStatsAggregator extends ColumnStatsAggregator implements
-    IExtrapolatePartStatus {
+        IExtrapolatePartStatus {
 
   private static final Logger LOG = LoggerFactory.getLogger(LongColumnStatsAggregator.class);
 
   @Override
   public ColumnStatisticsObj aggregate(List<ColStatsObjWithSourceInfo> colStatsWithSourceInfo,
-      List<String> partNames, boolean areAllPartsFound) throws MetaException {
+                                       List<String> partNames, boolean areAllPartsFound) throws MetaException {
     ColumnStatisticsObj statsObj = null;
     String colType = null;
     String colName = null;
@@ -59,12 +61,12 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
         colName = cso.getColName();
         colType = cso.getColType();
         statsObj = ColumnStatsAggregatorFactory.newColumnStaticsObj(colName, colType,
-            cso.getStatsData().getSetField());
+                cso.getStatsData().getSetField());
         LOG.trace("doAllPartitionContainStats for column: {} is: {}", colName,
-            doAllPartitionContainStats);
+                doAllPartitionContainStats);
       }
       StringColumnStatsDataInspector stringColumnStatsData =
-          (StringColumnStatsDataInspector) cso.getStatsData().getStringStats();
+              stringInspectorFromStats(cso);
       if (stringColumnStatsData.getNdvEstimator() == null) {
         ndvEstimator = null;
         break;
@@ -85,7 +87,7 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
     }
     if (ndvEstimator != null) {
       ndvEstimator = NumDistinctValueEstimatorFactory
-          .getEmptyNumDistinctValueEstimator(ndvEstimator);
+              .getEmptyNumDistinctValueEstimator(ndvEstimator);
     }
     LOG.debug("all of the bit vectors can merge for " + colName + " is " + (ndvEstimator != null));
     ColumnStatisticsData columnStatisticsData = new ColumnStatisticsData();
@@ -94,7 +96,7 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
       for (ColStatsObjWithSourceInfo csp : colStatsWithSourceInfo) {
         ColumnStatisticsObj cso = csp.getColStatsObj();
         StringColumnStatsDataInspector newData =
-            (StringColumnStatsDataInspector) cso.getStatsData().getStringStats();
+                stringInspectorFromStats(cso);
         if (ndvEstimator != null) {
           ndvEstimator.mergeEstimators(newData.getNdvEstimator());
         }
@@ -102,9 +104,9 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
           aggregateData = newData.deepCopy();
         } else {
           aggregateData
-              .setMaxColLen(Math.max(aggregateData.getMaxColLen(), newData.getMaxColLen()));
+                  .setMaxColLen(Math.max(aggregateData.getMaxColLen(), newData.getMaxColLen()));
           aggregateData
-              .setAvgColLen(Math.max(aggregateData.getAvgColLen(), newData.getAvgColLen()));
+                  .setAvgColLen(Math.max(aggregateData.getAvgColLen(), newData.getAvgColLen()));
           aggregateData.setNumNulls(aggregateData.getNumNulls() + newData.getNumNulls());
           aggregateData.setNumDVs(Math.max(aggregateData.getNumDVs(), newData.getNumDVs()));
         }
@@ -149,7 +151,7 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
           ColumnStatisticsObj cso = csp.getColStatsObj();
           String partName = csp.getPartName();
           StringColumnStatsDataInspector newData =
-              (StringColumnStatsDataInspector) cso.getStatsData().getStringStats();
+                  stringInspectorFromStats(cso);
           // newData.isSetBitVectors() should be true for sure because we
           // already checked it before.
           if (indexMap.get(partName) != curIndex) {
@@ -166,7 +168,7 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
               pseudoIndexSum = 0;
               length = 0;
               ndvEstimator = NumDistinctValueEstimatorFactory
-                  .getEmptyNumDistinctValueEstimator(ndvEstimator);
+                      .getEmptyNumDistinctValueEstimator(ndvEstimator);
             }
             aggregateData = null;
           }
@@ -179,9 +181,9 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
             aggregateData = newData.deepCopy();
           } else {
             aggregateData.setAvgColLen(Math.max(aggregateData.getAvgColLen(),
-                newData.getAvgColLen()));
+                    newData.getAvgColLen()));
             aggregateData.setMaxColLen(Math.max(aggregateData.getMaxColLen(),
-                newData.getMaxColLen()));
+                    newData.getMaxColLen()));
             aggregateData.setNumNulls(aggregateData.getNumNulls() + newData.getNumNulls());
           }
           ndvEstimator.mergeEstimators(newData.getNdvEstimator());
@@ -196,20 +198,20 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
         }
       }
       extrapolate(columnStatisticsData, partNames.size(), colStatsWithSourceInfo.size(),
-          adjustedIndexMap, adjustedStatsMap, -1);
+              adjustedIndexMap, adjustedStatsMap, -1);
     }
     LOG.debug(
-        "Ndv estimatation for {} is {} # of partitions requested: {} # of partitions found: {}",
-        colName, columnStatisticsData.getStringStats().getNumDVs(), partNames.size(),
-        colStatsWithSourceInfo.size());
+            "Ndv estimatation for {} is {} # of partitions requested: {} # of partitions found: {}",
+            colName, columnStatisticsData.getStringStats().getNumDVs(), partNames.size(),
+            colStatsWithSourceInfo.size());
     statsObj.setStatsData(columnStatisticsData);
     return statsObj;
   }
 
   @Override
   public void extrapolate(ColumnStatisticsData extrapolateData, int numParts,
-      int numPartsWithStats, Map<String, Double> adjustedIndexMap,
-      Map<String, ColumnStatisticsData> adjustedStatsMap, double densityAvg) {
+                          int numPartsWithStats, Map<String, Double> adjustedIndexMap,
+                          Map<String, ColumnStatisticsData> adjustedStatsMap, double densityAvg) {
     int rightBorderInd = numParts;
     StringColumnStatsDataInspector extrapolateStringData = new StringColumnStatsDataInspector();
     Map<String, StringColumnStatsData> extractedAdjustedStatsMap = new HashMap<>();
@@ -217,12 +219,12 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
       extractedAdjustedStatsMap.put(entry.getKey(), entry.getValue().getStringStats());
     }
     List<Map.Entry<String, StringColumnStatsData>> list = new LinkedList<>(
-        extractedAdjustedStatsMap.entrySet());
+            extractedAdjustedStatsMap.entrySet());
     // get the avgLen
     Collections.sort(list, new Comparator<Map.Entry<String, StringColumnStatsData>>() {
       @Override
       public int compare(Map.Entry<String, StringColumnStatsData> o1,
-          Map.Entry<String, StringColumnStatsData> o2) {
+                         Map.Entry<String, StringColumnStatsData> o2) {
         return Double.compare(o1.getValue().getAvgColLen(), o2.getValue().getAvgColLen());
       }
     });
@@ -245,7 +247,7 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
     Collections.sort(list, new Comparator<Map.Entry<String, StringColumnStatsData>>() {
       @Override
       public int compare(Map.Entry<String, StringColumnStatsData> o1,
-          Map.Entry<String, StringColumnStatsData> o2) {
+                         Map.Entry<String, StringColumnStatsData> o2) {
         return Long.compare(o1.getValue().getMaxColLen(), o2.getValue().getMaxColLen());
       }
     });
@@ -277,8 +279,8 @@ public class StringColumnStatsAggregator extends ColumnStatsAggregator implement
     Collections.sort(list, new Comparator<Map.Entry<String, StringColumnStatsData>>() {
       @Override
       public int compare(Map.Entry<String, StringColumnStatsData> o1,
-          Map.Entry<String, StringColumnStatsData> o2) {
-       return Long.compare(o1.getValue().getNumDVs(), o2.getValue().getNumDVs());
+                         Map.Entry<String, StringColumnStatsData> o2) {
+        return Long.compare(o1.getValue().getNumDVs(), o2.getValue().getNumDVs());
       }
     });
     minInd = adjustedIndexMap.get(list.get(0).getKey());

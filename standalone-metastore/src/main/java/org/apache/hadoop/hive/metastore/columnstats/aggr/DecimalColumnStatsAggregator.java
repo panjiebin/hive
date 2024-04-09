@@ -40,14 +40,16 @@ import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.ColStatsObjWithSour
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hive.metastore.columnstats.ColumnsStatsUtils.decimalInspectorFromStats;
+
 public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implements
-    IExtrapolatePartStatus {
+        IExtrapolatePartStatus {
 
   private static final Logger LOG = LoggerFactory.getLogger(DecimalColumnStatsAggregator.class);
 
   @Override
   public ColumnStatisticsObj aggregate(List<ColStatsObjWithSourceInfo> colStatsWithSourceInfo,
-      List<String> partNames, boolean areAllPartsFound) throws MetaException {
+                                       List<String> partNames, boolean areAllPartsFound) throws MetaException {
     ColumnStatisticsObj statsObj = null;
     String colType = null;
     String colName = null;
@@ -61,12 +63,12 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
         colName = cso.getColName();
         colType = cso.getColType();
         statsObj = ColumnStatsAggregatorFactory.newColumnStaticsObj(colName, colType,
-            cso.getStatsData().getSetField());
+                cso.getStatsData().getSetField());
         LOG.trace("doAllPartitionContainStats for column: {} is: {}", colName,
-            doAllPartitionContainStats);
+                doAllPartitionContainStats);
       }
       DecimalColumnStatsDataInspector decimalColumnStatsData =
-          (DecimalColumnStatsDataInspector) cso.getStatsData().getDecimalStats();
+              decimalInspectorFromStats(cso);
       if (decimalColumnStatsData.getNdvEstimator() == null) {
         ndvEstimator = null;
         break;
@@ -87,7 +89,7 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
     }
     if (ndvEstimator != null) {
       ndvEstimator = NumDistinctValueEstimatorFactory
-          .getEmptyNumDistinctValueEstimator(ndvEstimator);
+              .getEmptyNumDistinctValueEstimator(ndvEstimator);
     }
     LOG.debug("all of the bit vectors can merge for " + colName + " is " + (ndvEstimator != null));
     ColumnStatisticsData columnStatisticsData = new ColumnStatisticsData();
@@ -99,11 +101,11 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
       for (ColStatsObjWithSourceInfo csp : colStatsWithSourceInfo) {
         ColumnStatisticsObj cso = csp.getColStatsObj();
         DecimalColumnStatsDataInspector newData =
-            (DecimalColumnStatsDataInspector) cso.getStatsData().getDecimalStats();
+                decimalInspectorFromStats(cso);
         lowerBound = Math.max(lowerBound, newData.getNumDVs());
         higherBound += newData.getNumDVs();
         densityAvgSum += (MetaStoreUtils.decimalToDouble(newData.getHighValue()) - MetaStoreUtils
-            .decimalToDouble(newData.getLowValue())) / newData.getNumDVs();
+                .decimalToDouble(newData.getLowValue())) / newData.getNumDVs();
         if (ndvEstimator != null) {
           ndvEstimator.mergeEstimators(newData.getNdvEstimator());
         }
@@ -111,13 +113,13 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
           aggregateData = newData.deepCopy();
         } else {
           if (MetaStoreUtils.decimalToDouble(aggregateData.getLowValue()) < MetaStoreUtils
-              .decimalToDouble(newData.getLowValue())) {
+                  .decimalToDouble(newData.getLowValue())) {
             aggregateData.setLowValue(aggregateData.getLowValue());
           } else {
             aggregateData.setLowValue(newData.getLowValue());
           }
           if (MetaStoreUtils.decimalToDouble(aggregateData.getHighValue()) > MetaStoreUtils
-              .decimalToDouble(newData.getHighValue())) {
+                  .decimalToDouble(newData.getHighValue())) {
             aggregateData.setHighValue(aggregateData.getHighValue());
           } else {
             aggregateData.setHighValue(newData.getHighValue());
@@ -138,7 +140,7 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
           // if it is between lowerbound and higherbound.
           double densityAvg = densityAvgSum / partNames.size();
           estimation = (long) ((MetaStoreUtils.decimalToDouble(aggregateData.getHighValue()) - MetaStoreUtils
-              .decimalToDouble(aggregateData.getLowValue())) / densityAvg);
+                  .decimalToDouble(aggregateData.getLowValue())) / densityAvg);
           if (estimation < lowerBound) {
             estimation = lowerBound;
           } else if (estimation > higherBound) {
@@ -171,7 +173,7 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
           DecimalColumnStatsData newData = cso.getStatsData().getDecimalStats();
           if (useDensityFunctionForNDVEstimation) {
             densityAvgSum += (MetaStoreUtils.decimalToDouble(newData.getHighValue()) - MetaStoreUtils
-                .decimalToDouble(newData.getLowValue())) / newData.getNumDVs();
+                    .decimalToDouble(newData.getLowValue())) / newData.getNumDVs();
           }
           adjustedIndexMap.put(partName, (double) indexMap.get(partName));
           adjustedStatsMap.put(partName, cso.getStatsData());
@@ -188,7 +190,7 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
           ColumnStatisticsObj cso = csp.getColStatsObj();
           String partName = csp.getPartName();
           DecimalColumnStatsDataInspector newData =
-              (DecimalColumnStatsDataInspector) cso.getStatsData().getDecimalStats();
+                  decimalInspectorFromStats(cso);
           // newData.isSetBitVectors() should be true for sure because we
           // already checked it before.
           if (indexMap.get(partName) != curIndex) {
@@ -202,7 +204,7 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
               adjustedStatsMap.put(pseudoPartName.toString(), csd);
               if (useDensityFunctionForNDVEstimation) {
                 densityAvgSum += (MetaStoreUtils.decimalToDouble(aggregateData.getHighValue()) - MetaStoreUtils
-                    .decimalToDouble(aggregateData.getLowValue())) / aggregateData.getNumDVs();
+                        .decimalToDouble(aggregateData.getLowValue())) / aggregateData.getNumDVs();
               }
               // reset everything
               pseudoPartName = new StringBuilder();
@@ -221,13 +223,13 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
             aggregateData = newData.deepCopy();
           } else {
             if (MetaStoreUtils.decimalToDouble(aggregateData.getLowValue()) < MetaStoreUtils
-                .decimalToDouble(newData.getLowValue())) {
+                    .decimalToDouble(newData.getLowValue())) {
               aggregateData.setLowValue(aggregateData.getLowValue());
             } else {
               aggregateData.setLowValue(newData.getLowValue());
             }
             if (MetaStoreUtils.decimalToDouble(aggregateData.getHighValue()) > MetaStoreUtils
-                .decimalToDouble(newData.getHighValue())) {
+                    .decimalToDouble(newData.getHighValue())) {
               aggregateData.setHighValue(aggregateData.getHighValue());
             } else {
               aggregateData.setHighValue(newData.getHighValue());
@@ -245,25 +247,25 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
           adjustedStatsMap.put(pseudoPartName.toString(), csd);
           if (useDensityFunctionForNDVEstimation) {
             densityAvgSum += (MetaStoreUtils.decimalToDouble(aggregateData.getHighValue()) - MetaStoreUtils
-                .decimalToDouble(aggregateData.getLowValue())) / aggregateData.getNumDVs();
+                    .decimalToDouble(aggregateData.getLowValue())) / aggregateData.getNumDVs();
           }
         }
       }
       extrapolate(columnStatisticsData, partNames.size(), colStatsWithSourceInfo.size(),
-          adjustedIndexMap, adjustedStatsMap, densityAvgSum / adjustedStatsMap.size());
+              adjustedIndexMap, adjustedStatsMap, densityAvgSum / adjustedStatsMap.size());
     }
     LOG.debug(
-        "Ndv estimatation for {} is {} # of partitions requested: {} # of partitions found: {}",
-        colName, columnStatisticsData.getDecimalStats().getNumDVs(), partNames.size(),
-        colStatsWithSourceInfo.size());
+            "Ndv estimatation for {} is {} # of partitions requested: {} # of partitions found: {}",
+            colName, columnStatisticsData.getDecimalStats().getNumDVs(), partNames.size(),
+            colStatsWithSourceInfo.size());
     statsObj.setStatsData(columnStatisticsData);
     return statsObj;
   }
 
   @Override
   public void extrapolate(ColumnStatisticsData extrapolateData, int numParts,
-      int numPartsWithStats, Map<String, Double> adjustedIndexMap,
-      Map<String, ColumnStatisticsData> adjustedStatsMap, double densityAvg) {
+                          int numPartsWithStats, Map<String, Double> adjustedIndexMap,
+                          Map<String, ColumnStatisticsData> adjustedStatsMap, double densityAvg) {
     int rightBorderInd = numParts;
     DecimalColumnStatsDataInspector extrapolateDecimalData = new DecimalColumnStatsDataInspector();
     Map<String, DecimalColumnStatsData> extractedAdjustedStatsMap = new HashMap<>();
@@ -271,12 +273,12 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
       extractedAdjustedStatsMap.put(entry.getKey(), entry.getValue().getDecimalStats());
     }
     List<Map.Entry<String, DecimalColumnStatsData>> list = new LinkedList<>(
-        extractedAdjustedStatsMap.entrySet());
+            extractedAdjustedStatsMap.entrySet());
     // get the lowValue
     Collections.sort(list, new Comparator<Map.Entry<String, DecimalColumnStatsData>>() {
       @Override
       public int compare(Map.Entry<String, DecimalColumnStatsData> o1,
-          Map.Entry<String, DecimalColumnStatsData> o2) {
+                         Map.Entry<String, DecimalColumnStatsData> o2) {
         return o1.getValue().getLowValue().compareTo(o2.getValue().getLowValue());
       }
     });
@@ -299,7 +301,7 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
     Collections.sort(list, new Comparator<Map.Entry<String, DecimalColumnStatsData>>() {
       @Override
       public int compare(Map.Entry<String, DecimalColumnStatsData> o1,
-          Map.Entry<String, DecimalColumnStatsData> o2) {
+                         Map.Entry<String, DecimalColumnStatsData> o2) {
         return o1.getValue().getHighValue().compareTo(o2.getValue().getHighValue());
       }
     });
@@ -333,7 +335,7 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
     Collections.sort(list, new Comparator<Map.Entry<String, DecimalColumnStatsData>>() {
       @Override
       public int compare(Map.Entry<String, DecimalColumnStatsData> o1,
-          Map.Entry<String, DecimalColumnStatsData> o2) {
+                         Map.Entry<String, DecimalColumnStatsData> o2) {
         return Long.compare(o1.getValue().getNumDVs(), o2.getValue().getNumDVs());
       }
     });
@@ -365,9 +367,9 @@ public class DecimalColumnStatsAggregator extends ColumnStatsAggregator implemen
       }
     }
     extrapolateDecimalData.setLowValue(DecimalUtils.createThriftDecimal(String
-        .valueOf(lowValue)));
+            .valueOf(lowValue)));
     extrapolateDecimalData.setHighValue(DecimalUtils.createThriftDecimal(String
-        .valueOf(highValue)));
+            .valueOf(highValue)));
     extrapolateDecimalData.setNumNulls(numNulls);
     extrapolateDecimalData.setNumDVs(ndv);
     extrapolateData.setDecimalStats(extrapolateDecimalData);

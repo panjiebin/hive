@@ -33,7 +33,7 @@ public class StringColumnStatsDataInspector extends StringColumnStatsData {
   }
 
   public StringColumnStatsDataInspector(long maxColLen, double avgColLen,
-      long numNulls, long numDVs) {
+                                        long numNulls, long numDVs) {
     super(maxColLen, avgColLen, numNulls, numDVs);
   }
 
@@ -43,6 +43,11 @@ public class StringColumnStatsDataInspector extends StringColumnStatsData {
       super.setBitVectors(ndvEstimator.serialize());
     }
   }
+
+  public StringColumnStatsDataInspector(StringColumnStatsData other) {
+    super(other);
+  }
+
 
   @Override
   public StringColumnStatsDataInspector deepCopy() {
@@ -118,7 +123,7 @@ public class StringColumnStatsDataInspector extends StringColumnStatsData {
 
   private void updateNdvEstimator() {
     this.ndvEstimator = NumDistinctValueEstimatorFactory
-        .getNumDistinctValueEstimator(super.getBitVectors());
+            .getNumDistinctValueEstimator(super.getBitVectors());
     super.unsetBitVectors();
   }
 

@@ -37,14 +37,16 @@ import org.apache.hadoop.hive.metastore.utils.MetaStoreUtils.ColStatsObjWithSour
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import static org.apache.hadoop.hive.metastore.columnstats.ColumnsStatsUtils.doubleInspectorFromStats;
+
 public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implements
-    IExtrapolatePartStatus {
+        IExtrapolatePartStatus {
 
   private static final Logger LOG = LoggerFactory.getLogger(LongColumnStatsAggregator.class);
 
   @Override
   public ColumnStatisticsObj aggregate(List<ColStatsObjWithSourceInfo> colStatsWithSourceInfo,
-      List<String> partNames, boolean areAllPartsFound) throws MetaException {
+                                       List<String> partNames, boolean areAllPartsFound) throws MetaException {
     ColumnStatisticsObj statsObj = null;
     String colType = null;
     String colName = null;
@@ -58,12 +60,12 @@ public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implement
         colName = cso.getColName();
         colType = cso.getColType();
         statsObj = ColumnStatsAggregatorFactory.newColumnStaticsObj(colName, colType,
-            cso.getStatsData().getSetField());
+                cso.getStatsData().getSetField());
         LOG.trace("doAllPartitionContainStats for column: {} is: {}", colName,
-            doAllPartitionContainStats);
+                doAllPartitionContainStats);
       }
       DoubleColumnStatsDataInspector doubleColumnStatsData =
-          (DoubleColumnStatsDataInspector) cso.getStatsData().getDoubleStats();
+              doubleInspectorFromStats(cso);
       if (doubleColumnStatsData.getNdvEstimator() == null) {
         ndvEstimator = null;
         break;
@@ -84,7 +86,7 @@ public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implement
     }
     if (ndvEstimator != null) {
       ndvEstimator = NumDistinctValueEstimatorFactory
-          .getEmptyNumDistinctValueEstimator(ndvEstimator);
+              .getEmptyNumDistinctValueEstimator(ndvEstimator);
     }
     LOG.debug("all of the bit vectors can merge for " + colName + " is " + (ndvEstimator != null));
     ColumnStatisticsData columnStatisticsData = new ColumnStatisticsData();
@@ -96,7 +98,7 @@ public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implement
       for (ColStatsObjWithSourceInfo csp : colStatsWithSourceInfo) {
         ColumnStatisticsObj cso = csp.getColStatsObj();
         DoubleColumnStatsDataInspector newData =
-            (DoubleColumnStatsDataInspector) cso.getStatsData().getDoubleStats();
+                doubleInspectorFromStats(cso);
         lowerBound = Math.max(lowerBound, newData.getNumDVs());
         higherBound += newData.getNumDVs();
         densityAvgSum += (newData.getHighValue() - newData.getLowValue()) / newData.getNumDVs();
@@ -108,7 +110,7 @@ public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implement
         } else {
           aggregateData.setLowValue(Math.min(aggregateData.getLowValue(), newData.getLowValue()));
           aggregateData
-              .setHighValue(Math.max(aggregateData.getHighValue(), newData.getHighValue()));
+                  .setHighValue(Math.max(aggregateData.getHighValue(), newData.getHighValue()));
           aggregateData.setNumNulls(aggregateData.getNumNulls() + newData.getNumNulls());
           aggregateData.setNumDVs(Math.max(aggregateData.getNumDVs(), newData.getNumDVs()));
         }
@@ -173,7 +175,7 @@ public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implement
           ColumnStatisticsObj cso = csp.getColStatsObj();
           String partName = csp.getPartName();
           DoubleColumnStatsDataInspector newData =
-              (DoubleColumnStatsDataInspector) cso.getStatsData().getDoubleStats();
+                  doubleInspectorFromStats(cso);
           // newData.isSetBitVectors() should be true for sure because we
           // already checked it before.
           if (indexMap.get(partName) != curIndex) {
@@ -206,7 +208,7 @@ public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implement
           } else {
             aggregateData.setLowValue(Math.min(aggregateData.getLowValue(), newData.getLowValue()));
             aggregateData.setHighValue(Math.max(aggregateData.getHighValue(),
-                newData.getHighValue()));
+                    newData.getHighValue()));
             aggregateData.setNumNulls(aggregateData.getNumNulls() + newData.getNumNulls());
           }
           ndvEstimator.mergeEstimators(newData.getNdvEstimator());
@@ -224,20 +226,20 @@ public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implement
         }
       }
       extrapolate(columnStatisticsData, partNames.size(), colStatsWithSourceInfo.size(),
-          adjustedIndexMap, adjustedStatsMap, densityAvgSum / adjustedStatsMap.size());
+              adjustedIndexMap, adjustedStatsMap, densityAvgSum / adjustedStatsMap.size());
     }
     LOG.debug(
-        "Ndv estimatation for {} is {}. # of partitions requested: {}. # of partitions found: {}",
-        colName, columnStatisticsData.getDoubleStats().getNumDVs(), partNames.size(),
-        colStatsWithSourceInfo.size());
+            "Ndv estimatation for {} is {}. # of partitions requested: {}. # of partitions found: {}",
+            colName, columnStatisticsData.getDoubleStats().getNumDVs(), partNames.size(),
+            colStatsWithSourceInfo.size());
     statsObj.setStatsData(columnStatisticsData);
     return statsObj;
   }
 
   @Override
   public void extrapolate(ColumnStatisticsData extrapolateData, int numParts,
-      int numPartsWithStats, Map<String, Double> adjustedIndexMap,
-      Map<String, ColumnStatisticsData> adjustedStatsMap, double densityAvg) {
+                          int numPartsWithStats, Map<String, Double> adjustedIndexMap,
+                          Map<String, ColumnStatisticsData> adjustedStatsMap, double densityAvg) {
     int rightBorderInd = numParts;
     DoubleColumnStatsDataInspector extrapolateDoubleData = new DoubleColumnStatsDataInspector();
     Map<String, DoubleColumnStatsData> extractedAdjustedStatsMap = new HashMap<>();
@@ -245,12 +247,12 @@ public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implement
       extractedAdjustedStatsMap.put(entry.getKey(), entry.getValue().getDoubleStats());
     }
     List<Map.Entry<String, DoubleColumnStatsData>> list = new LinkedList<>(
-        extractedAdjustedStatsMap.entrySet());
+            extractedAdjustedStatsMap.entrySet());
     // get the lowValue
     Collections.sort(list, new Comparator<Map.Entry<String, DoubleColumnStatsData>>() {
       @Override
       public int compare(Map.Entry<String, DoubleColumnStatsData> o1,
-          Map.Entry<String, DoubleColumnStatsData> o2) {
+                         Map.Entry<String, DoubleColumnStatsData> o2) {
         return Double.compare(o1.getValue().getLowValue(), o2.getValue().getLowValue());
       }
     });
@@ -273,7 +275,7 @@ public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implement
     Collections.sort(list, new Comparator<Map.Entry<String, DoubleColumnStatsData>>() {
       @Override
       public int compare(Map.Entry<String, DoubleColumnStatsData> o1,
-          Map.Entry<String, DoubleColumnStatsData> o2) {
+                         Map.Entry<String, DoubleColumnStatsData> o2) {
         return Double.compare(o1.getValue().getHighValue(), o2.getValue().getHighValue());
       }
     });
@@ -307,7 +309,7 @@ public class DoubleColumnStatsAggregator extends ColumnStatsAggregator implement
     Collections.sort(list, new Comparator<Map.Entry<String, DoubleColumnStatsData>>() {
       @Override
       public int compare(Map.Entry<String, DoubleColumnStatsData> o1,
-          Map.Entry<String, DoubleColumnStatsData> o2) {
+                         Map.Entry<String, DoubleColumnStatsData> o2) {
         return Long.compare(o1.getValue().getNumDVs(), o2.getValue().getNumDVs());
       }
     });
